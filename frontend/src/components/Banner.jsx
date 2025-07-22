@@ -10,7 +10,7 @@ const Banner = () => {
       <div className="flex-1 py-8 sm:text-center sm:py-10 md:py-16 lg:py-24 lg:pl-5">
         <div className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-semibold text-white">
           <p>Book an Appointment </p>
-          <p className="mt-4 ">With our 100+ Trusted Doctors </p>
+          <p className="mt-4 ">With our 100+ Trusted Doctors  </p>
         </div>
 
         <button
@@ -20,7 +20,7 @@ const Banner = () => {
           }}
           className="bg-white text-sm sm:text-base cursor-pointer text-gray-600 px-8 py-3 rounded-full mt-6 hover:scale-105 transition-all "
         >
-          Create account
+          Create account to Continue
         </button>
       </div>
 
