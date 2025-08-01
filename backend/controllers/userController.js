@@ -1,8 +1,9 @@
 import validator from "validator";
-import bycrypt from "bcrypt";
+import bcrypt from "bcrypt";
 import userModel from "../models/userModel.js";
 import jwt from "jsonwebtoken";
-import { v2 as cloudinary } from "cloudinary";
+import { v2 as Cloudinary } from "cloudinary";
+
 
 
 
@@ -28,8 +29,8 @@ const registerUser = async (req, res) => {
     }
 
     // hashing user password
-    const salt = await bycrypt.genSalt(10);
-    const hashedPassword = await bycrypt.hash(password, salt);
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
     const userData = {
       name,
@@ -40,7 +41,7 @@ const registerUser = async (req, res) => {
     const newUser = new userModel(userData);
     const user = await newUser.save();
 
-    const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET);
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
 
     res.json({ success: true, token });
   } catch (error) {
@@ -59,7 +60,7 @@ const loginUser = async (req, res) => {
       return res.json({ success: false, message: "User does not exist" });
     }
 
-    const isMatch = await bycrypt.compare(password, user.password);
+    const isMatch = await bcrypt.compare(password, user.password);
 
     if (isMatch) {
       const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
@@ -73,50 +74,61 @@ const loginUser = async (req, res) => {
   }
 };
 
+
+// API to get user profile data
 const getProfile = async (req, res) => {
   try {
-    const { userId } = req.body;
-    const useData = await userModel.findById(userId).select("-password");
+    const  userId  = req.userId; // using req.userId set by authUser middleware
+    const userData = await userModel.findById(userId).select("-password");
 
-    res.json({ success: true, user: useData });
+    res.json({ success: true, user: userData });
   } catch (error) {
     console.log(error);
     res.json({ success: false, message: error.message });
   }
 };
 
-// API to update user profile
+//API to Update User Profile
 const updateProfile = async (req, res) => {
   try {
-    const { userId, name, phone, address, dob, gender } = req.body;
+    const userId = req.userId;
+    const { name, phone, address, dob, gender } = req.body;
     const imageFile = req.file;
 
-    if (!name || !phone || !dob || !gender) {
-      return res.json({ success: false, message: "Data Missing" });
+    if (!name || !phone || !gender || !dob || !address) {
+      return res.json({
+        success: false,
+        message: "Data Missing",
+      });
     }
 
     await userModel.findByIdAndUpdate(userId, {
-      name,
-      phone,
-      address: JSON.parse(address),
-      dob,
-      gender,
+      name: name,
+      phone: phone,
+      address: address,
+      gender: gender,
+      dob: dob,
     });
 
     if (imageFile) {
-      // upload image to cloudinary
-      const imageUpload = await cloudinary.uploader.upload(imageFile.path, {
+      // Upload Image to Cloudinary
+      const imageUpload = await Cloudinary.uploader.upload(imageFile.path, {
         resource_type: "image",
       });
-      const imageURL = imageUpload.secure_url;
+      const imageUrl = imageUpload.secure_url;
 
-      await userModel.findByIdAndUpdate(userId, { image: imageURL });
+      await userModel.findByIdAndUpdate(userId, { image: imageUrl });
     }
 
-    res.json({ success: true, message: "Profile Updated" });
+    return res.json({
+      success: true,
+      message: "Profile Updated",
+    });
   } catch (error) {
-    console.log(error);
-    res.json({ success: false, message: error.message });
+    return res.json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
