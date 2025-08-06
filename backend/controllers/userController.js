@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import { v2 as Cloudinary } from "cloudinary";
 import doctorModel from "../models/doctorModel.js";
 import appointmentModel from "../models/appointmentModel.js";
+import razorpay from "razorpay";
 
 
 
@@ -247,6 +248,59 @@ const cancelAppointment = async (req, res) => {
   }
 };
 
+const razorpayInstance = new razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
+// api to make payment
+const paymentRazorpay = async (req, res) => {
+  try {
+    const { appointmentId } = req.body;
+    const appointmentData = await appointmentModel.findById(appointmentId);
+    if (!appointmentData) {
+      return res.json({ success: false, message: "Appointment not found" });
+    }
+
+    const options = {
+      amount: appointmentData.amount * 100, // amount in the smallest currency unit
+      currency: process.env.CURRENCY,
+      receipt: appointmentId,
+    };
+
+    const order = await razorpayInstance.orders.create(options);
+    res.json({ success: true, order });
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+
+const verifyRazorpay = async (req, res) => {
+  try {
+    const { razorpay_order_id } = req.body;
+    const orderInfo = await razorpayInstance.orders.fetch(razorpay_order_id);
+    if (orderInfo.status === "paid") {
+      // Update appointment payment status
+      await appointmentModel.findOneAndUpdate(
+       { _id: orderInfo.receipt },
+        { payment: "true" },
+        { new: true }
+      );
+      return res.json({ success: true, message: "Payment verified successfully" });
+    }
+    else {
+      return res.json({ success: false, message: "Payment verification failed" });
+    }
+
+    
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }
+}
+
 
 export {
   registerUser,
@@ -256,4 +310,7 @@ export {
   bookAppointment,
   listAppointment,
   cancelAppointment
+,
+  paymentRazorpay,
+  verifyRazorpay
 };

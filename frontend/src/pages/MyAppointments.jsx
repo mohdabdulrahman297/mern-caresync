@@ -1,10 +1,11 @@
 import React, { useContext, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppContext } from "../context/AppContext";
 import axios from "axios";
 import { toast } from "react-toastify";
 
 const MyAppointments = () => {
-  const { backendUrl, token, getDoctorsData  } = useContext(AppContext);
+  const { backendUrl, token, getDoctorsData } = useContext(AppContext);
 
   const [appointments, setAppointments] = useState([]);
   const months = [
@@ -22,6 +23,8 @@ const MyAppointments = () => {
     "Nov",
     "Dec",
   ];
+
+  const navigate = useNavigate();
 
   const slotDateFormat = (slotDate) => {
     const dateArray = slotDate.split("_");
@@ -56,9 +59,60 @@ const MyAppointments = () => {
       if (data.success) {
         toast.success(data.message);
         getUserAppointments();
-        getDoctorsData();
+        navigate("/my-appointments");
       } else {
         toast.error(data.message);
+      }
+    } catch (error) {
+      console.log(error);
+      toast.error(error.message);
+    }
+  };
+
+  const initPay = (order) => {
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID, // Your Razorpay key ID
+      amount: order.amount,
+      currency: order.currency,
+      name: "CareSync payment",
+      description: "Appointment Payment",
+      order_id: order.id,
+      receipt: order.receipt,
+      handler: async (response) => {
+        // Handle payment success
+        console.log("Payment successful:", response);
+        try {
+          const { data } = await axios.post(
+            backendUrl + "/api/user/verify-razorpay",
+            response,
+            { headers: { token } }
+          );
+          if (data.success) {
+            toast.success("Payment successful!");
+            getUserAppointments();
+          } else {
+            toast.error(data.message);
+          }
+        } catch (error) {
+          console.log(error);
+          toast.error(error.message);
+        }
+      },
+    };
+    const rzp1 = new window.Razorpay(options);
+    rzp1.open();
+  };
+
+  const appointmentRazorpay = async (appointmentId) => {
+    try {
+      const { data } = await axios.post(
+        backendUrl + "/api/user/payment-razorpay",
+        { appointmentId },
+        { headers: { token } }
+      );
+
+      if (data.success) {
+        initPay(data.order);
       }
     } catch (error) {
       console.log(error);
@@ -84,10 +138,16 @@ const MyAppointments = () => {
             key={index}
           >
             <div>
-              <img className="w-32 h-32 object-cover bg-emerald-400 rounded" src={item.docData.image} alt={item.docData.name} />
+              <img
+                className="w-32 h-32 object-cover bg-emerald-400 rounded"
+                src={item.docData.image}
+                alt={item.docData.name}
+              />
             </div>
             <div className="flex-1 text-sm text-zinc-600">
-              <p className="text-neutral-800 font-semibold">{item.docData.name}</p>
+              <p className="text-neutral-800 font-semibold">
+                {item.docData.name}
+              </p>
               <p>{item.docData.speciality}</p>
               <p className="text-zinc-700 font-medium mt-1">Address:</p>
               <p className="text-xs">{item.docData.address.line1}</p>
@@ -100,8 +160,16 @@ const MyAppointments = () => {
               </p>
             </div>
             <div className="flex flex-col gap-2 justify-end cursor-pointer">
-              {!item.cancelled && (
-                <button className="text-sm text-stone-500 text-center sm:min-w-48 py-2 border rounded hover:bg-emerald-400 hover:text-white transition-all duration-300">
+              {!item.cancelled && item.payment && (
+                <button className="sm:min-w-48 py-2 border border-green-500 rounded text-green-500">
+                  Payment done
+                </button>
+              )}  
+              {!item.cancelled && !item.payment && (
+                <button
+                  onClick={() => appointmentRazorpay(item._id)}
+                  className="text-sm text-stone-500 text-center sm:min-w-48 py-2 border rounded hover:bg-emerald-400 hover:text-white transition-all duration-300"
+                >
                   Pay Online
                 </button>
               )}
